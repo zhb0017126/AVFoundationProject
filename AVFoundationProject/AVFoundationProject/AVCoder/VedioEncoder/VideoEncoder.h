@@ -21,5 +21,5 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) VedioConfig *config;
 - (instancetype)initWithConfig:(VedioConfig*)config;
 @end
-
+// 视频处理特点。 数据在代理里回调
 NS_ASSUME_NONNULL_END

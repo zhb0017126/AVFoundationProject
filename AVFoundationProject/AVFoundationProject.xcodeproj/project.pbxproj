@@ -17,6 +17,7 @@
 		2156379D26071338004D16C3 /* AVFoundationProjectTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2156379C26071338004D16C3 /* AVFoundationProjectTests.m */; };
 		215637A826071338004D16C3 /* AVFoundationProjectUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 215637A726071338004D16C3 /* AVFoundationProjectUITests.m */; };
 		215637C326071CA8004D16C3 /* SystomCaptureForDecode.m in Sources */ = {isa = PBXBuildFile; fileRef = 215637C226071CA8004D16C3 /* SystomCaptureForDecode.m */; };
+		2157BDDD2619922000D979CC /* AudioDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 2157BDDC2619922000D979CC /* AudioDecoder.m */; };
 		2189302F261342E200E476EC /* VideoDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 2189302E261342E200E476EC /* VideoDecoder.m */; };
 		218930382613431000E476EC /* AVConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 218930372613431000E476EC /* AVConfig.m */; };
 		218931EA2615E87400E476EC /* VideoEncoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 218931E92615E87400E476EC /* VideoEncoder.m */; };
@@ -61,6 +62,8 @@
 		215637A926071338004D16C3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		215637C126071CA8004D16C3 /* SystomCaptureForDecode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SystomCaptureForDecode.h; sourceTree = "<group>"; };
 		215637C226071CA8004D16C3 /* SystomCaptureForDecode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SystomCaptureForDecode.m; sourceTree = "<group>"; };
+		2157BDDB2619921F00D979CC /* AudioDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioDecoder.h; sourceTree = "<group>"; };
+		2157BDDC2619922000D979CC /* AudioDecoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AudioDecoder.m; sourceTree = "<group>"; };
 		2189302D261342E200E476EC /* VideoDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VideoDecoder.h; sourceTree = "<group>"; };
 		2189302E261342E200E476EC /* VideoDecoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VideoDecoder.m; sourceTree = "<group>"; };
 		218930362613431000E476EC /* AVConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AVConfig.h; sourceTree = "<group>"; };
@@ -187,6 +190,8 @@
 			children = (
 				2189326A2617096100E476EC /* AudioEncoder.h */,
 				2189326B2617096100E476EC /* AudioEncoder.m */,
+				2157BDDB2619921F00D979CC /* AudioDecoder.h */,
+				2157BDDC2619922000D979CC /* AudioDecoder.m */,
 			);
 			path = AudioEncoder;
 			sourceTree = "<group>";
@@ -334,6 +339,7 @@
 				218931EA2615E87400E476EC /* VideoEncoder.m in Sources */,
 				2156378826071337004D16C3 /* ViewController.m in Sources */,
 				218930382613431000E476EC /* AVConfig.m in Sources */,
+				2157BDDD2619922000D979CC /* AudioDecoder.m in Sources */,
 				2156378226071337004D16C3 /* AppDelegate.m in Sources */,
 				2156379326071338004D16C3 /* main.m in Sources */,
 				215637C326071CA8004D16C3 /* SystomCaptureForDecode.m in Sources */,

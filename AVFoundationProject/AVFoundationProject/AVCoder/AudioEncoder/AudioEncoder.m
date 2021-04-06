@@ -49,8 +49,114 @@
     if (!_audioConverter) {
         [self setupEncoderWithSampleBuffer:sampleBuffer];
     }
+    //2.来到音频编码异步队列
+    dispatch_async(_encoderQueue, ^{
+        //3.根据CMSampleBufferRef获取CMBlockBuffer, 这里面保存了PCM数据
+        CMBlockBufferRef blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer);
+        CFRetain(blockBuffer);
+        //4.获取BlockBuffer中音频数据大小以及音频数据地址 (指针 + 大小)
+        OSStatus status = CMBlockBufferGetDataPointer(blockBuffer, 0, NULL, &_pcmBufferSize, &_pcmBuffer);
+        //5.判断status状态
+        NSError *error = nil;
+        if (status != kCMBlockBufferNoErr) {
+            error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+            NSLog(@"Error: ACC encode get data point error: %@",error);
+            return;
+        }
+        
+        // 6. 填充Pcm数据
+        //设置_aacBuffer 为0
+        //开辟_pcmBuffsize大小的pcm内存空间
+        uint8_t *pcmBuffer = malloc(_pcmBufferSize);
+        //将_pcmBufferSize数据set到pcmBuffer中.
+        memset(pcmBuffer, 0, _pcmBufferSize);
+    
+        //3.输出buffer
+        /*
+         typedef struct AudioBufferList {
+         UInt32 mNumberBuffers;
+         AudioBuffer mBuffers[1];
+         } AudioBufferList;
+         
+         struct AudioBuffer
+         {
+         UInt32              mNumberChannels;
+         UInt32              mDataByteSize;
+         void* __nullable    mData;
+         };
+         typedef struct AudioBuffer  AudioBuffer;
+         */
+        //将pcmBuffer数据填充到outAudioBufferList 对象中
+        AudioBufferList outAudioBufferList = {0};
+        outAudioBufferList.mNumberBuffers = 1;
+        outAudioBufferList.mBuffers[0].mNumberChannels = (uint32_t)_config.channelCount;
+        outAudioBufferList.mBuffers[0].mDataByteSize = (UInt32)_pcmBufferSize;
+        outAudioBufferList.mBuffers[0].mData = pcmBuffer;
+        
+        //输出包大小为1
+        UInt32 outputDataPacketSize = 1;
+        
+        //配置填充函数，获取输出数据
+        //转换由输入回调函数提供的数据
+        /*
+         参数1: inAudioConverter 音频转换器
+         参数2: inInputDataProc 回调函数.提供要转换的音频数据的回调函数。当转换器准备好接受新的输入数据时，会重复调用此回调.
+         参数3: inInputDataProcUserData
+         参数4: inInputDataProcUserData,self
+         参数5: ioOutputDataPacketSize,输出缓冲区的大小
+         参数6: outOutputData,需要转换的音频数据
+         参数7: outPacketDescription,输出包信息
+         */
+        status = AudioConverterFillComplexBuffer(_audioConverter, aacEncodeInputDataProc, (__bridge void * _Nullable)(self), &outputDataPacketSize, &outAudioBufferList, NULL);
+        
+        if (status == noErr) {
+            //获取数据  解析元素信息。
+            NSData *rawAAC = [NSData dataWithBytes: outAudioBufferList.mBuffers[0].mData length:outAudioBufferList.mBuffers[0].mDataByteSize];
+            //释放pcmBuffer
+            free(pcmBuffer);
+            //添加ADTS头，想要获取裸流时，请忽略添加ADTS头，写入文件时，必须添加
+            //            NSData *adtsHeader = [self adtsDataForPacketLength:rawAAC.length];
+            //            NSMutableData *fullData = [NSMutableData dataWithCapacity:adtsHeader.length + rawAAC.length];;
+            //            [fullData appendData:adtsHeader];
+            //            [fullData appendData:rawAAC];
+            //将数据传递到回调队列中
+            dispatch_async(self.callbackQueue, ^{
+                [self.delegate audioEncodeCallback:rawAAC];
+            });
+        } else {
+            error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+        }
+        
+        CFRelease(blockBuffer);
+        CFRelease(sampleBuffer);
+        if (error) {
+            NSLog(@"error: AAC编码失败 %@",error);
+        }
+        
+    });
 }
-
+//编码器回调函数
+static OSStatus aacEncodeInputDataProc(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets, AudioBufferList *ioData, AudioStreamPacketDescription **outDataPacketDescription, void *inUserData) {
+    
+    //获取self
+    AudioEncoder *aacEncoder = (__bridge AudioEncoder *)(inUserData);
+   
+    //判断pcmBuffsize大小
+    if (!aacEncoder.pcmBufferSize) {
+        *ioNumberDataPackets = 0;
+        return  - 1;
+    }
+    
+    //填充
+    ioData->mBuffers[0].mData = aacEncoder.pcmBuffer;
+    ioData->mBuffers[0].mDataByteSize = (uint32_t)aacEncoder.pcmBufferSize;
+    ioData->mBuffers[0].mNumberChannels = (uint32_t)aacEncoder.config.channelCount;
+    
+    //填充完毕,则清空数据
+    aacEncoder.pcmBufferSize = 0;
+    *ioNumberDataPackets = 1;
+    return noErr;
+}
 //配置音频编码参数
 - (void)setupEncoderWithSampleBuffer: (CMSampleBufferRef)sampleBuffer {
     
@@ -171,6 +277,53 @@
     }
     return nil;
 }
+/**
+ *  Add ADTS header at the beginning of each and every AAC packet.
+ *  This is needed as MediaCodec encoder generates a packet of raw
+ *  AAC data.
+ *
+ *  AAC ADtS头
+ *  Note the packetLen must count in the ADTS header itself.
+ *  See: http://wiki.multimedia.cx/index.php?title=ADTS
+ *  Also: http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Channel_Configurations
+ **/
+- (NSData*)adtsDataForPacketLength:(NSUInteger)packetLength {
+    int adtsLength = 7;
+    char *packet = malloc(sizeof(char) * adtsLength);
+    // Variables Recycled by addADTStoPacket
+    int profile = 2;  //AAC LC
+    //39=MediaCodecInfo.CodecProfileLevel.AACObjectELD;
+    int freqIdx = 4;  //3： 48000 Hz、4：44.1KHz、8: 16000 Hz、11: 8000 Hz
+    int chanCfg = 1;  //MPEG-4 Audio Channel Configuration. 1 Channel front-center
+    NSUInteger fullLength = adtsLength + packetLength;
+    // fill in ADTS data
+    packet[0] = (char)0xFF;    // 11111111      = syncword
+    packet[1] = (char)0xF9;    // 1111 1 00 1  = syncword MPEG-2 Layer CRC
+    packet[2] = (char)(((profile-1)<<6) + (freqIdx<<2) +(chanCfg>>2));
+    packet[3] = (char)(((chanCfg&3)<<6) + (fullLength>>11));
+    packet[4] = (char)((fullLength&0x7FF) >> 3);
+    packet[5] = (char)(((fullLength&7)<<5) + 0x1F);
+    packet[6] = (char)0xFC;
+    NSData *data = [NSData dataWithBytesNoCopy:packet length:adtsLength freeWhenDone:YES];
+    return data;
+}
 
+/**
+ .AAC文件处理流程
+ (1)　判断文件格式，确定为ADIF或ADTS
+ (2)　若为ADIF，解ADIF头信息，跳至第6步。
+ (3)　若为ADTS，寻找同步头。
+ (4)解ADTS帧头信息。
+ (5)若有错误检测，进行错误检测。
+ (6)解块信息。
+ (7)解元素信息。
+ */
+
+- (void)dealloc {
+    if (_audioConverter) {
+        AudioConverterDispose(_audioConverter);
+        _audioConverter = NULL;
+    }
+}
 
 @end
